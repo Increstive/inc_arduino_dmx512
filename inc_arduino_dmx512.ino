@@ -21,10 +21,9 @@ unsigned int dmxaddress = 1;
 
 // DMX variables
 
-volatile byte dmxreceived = 0;                //the latest received value
 volatile unsigned int dmxcurrent = 0;         //counter variable that is incremented every time we receive a value.
-volatile byte dmxvalue[NUMBER_OF_CHANNELS];   //DMX values
 volatile boolean dmxnewvalue = false;         //set to 1 when updated dmx values are received
+volatile byte dmxvalue[NUMBER_OF_CHANNELS];   //DMX values
 
 // Timer2 variables
 volatile byte zerocounter = 0;
@@ -33,14 +32,6 @@ volatile byte zerocounter = 0;
 
 void setup() {
 
-  for (int i = 0; i < NUMBER_OF_CHANNELS; i++) {
-    dmxvalue[i] = 0;
-  }
-
-  // DEBUG Config
-  Serial2.begin(115200);
-  Serial2.println("Start");
-  
   pinMode(5, OUTPUT);
   pinMode(6, OUTPUT);
   pinMode(11, OUTPUT);
@@ -90,15 +81,14 @@ void loop()  {
   // the processor gets parked here while the ISRs are doing their thing.
 
   if (dmxnewvalue == 1) {
-    byte curr = dmxvalue[4];
-    Serial2.println(curr);
-    
-    analogWrite(5, dmxvalue[4]);
-    analogWrite(6, dmxvalue[5]);
-    analogWrite(11, dmxvalue[6]);
+    analogWrite(5, dmxvalue[0]);
+    analogWrite(6, dmxvalue[1]);
+    analogWrite(11, dmxvalue[2]);
 
     dmxnewvalue = 0;
     zerocounter = 0;           //and then when finished reset variables and enable timer2 interrupt
+    delay(1);
+    
     bitSet(TIMSK2, OCIE2A);    //Enable Timer/Counter2 Output Compare Match A Interrupt
   }
 } //end loop()
@@ -114,24 +104,23 @@ ISR(TIMER2_COMPA_vect) {
     {
       bitClear(TIMSK2, OCIE2A);    //disable this interrupt and enable reception interrupt now that we're in a break.
       bitSet(UCSR0B, RXCIE0);
-      dmxcurrent = 0;
     }
   }
 } //end Timer2 ISR
 
 ISR(USART0_RX_vect) {
-  
-  dmxreceived = UDR0;
+
+  byte dmxreceived = UDR0;
 
   /* The receive buffer (UDR0) must be read during the reception ISR, or the ISR will just
      execute again immediately upon exiting. */
 
-  dmxvalue[dmxcurrent] = dmxreceived;
+  dmxvalue[(dmxcurrent - 4) % NUMBER_OF_CHANNELS] = dmxreceived;
 
   if (++dmxcurrent > NUMBER_OF_CHANNELS - 1) {
-    bitClear(UCSR0B, RXCIE0);
     dmxnewvalue = 1;
     dmxcurrent = 0;
+    bitClear(UCSR0B, RXCIE0);
   }
 
 } // end ISR
