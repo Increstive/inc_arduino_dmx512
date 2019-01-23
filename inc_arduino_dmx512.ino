@@ -19,22 +19,48 @@ unsigned int dmxaddress = 1;
 #define RX_PIN 0
 #define TX_PIN 1
 
+#define ADDRESS 0
+#define CHANNELS 3
+unsigned int currentChannel = 0;
+
 // DMX variables
 
 volatile unsigned int dmxcurrent = 0;         //counter variable that is incremented every time we receive a value.
 volatile boolean dmxnewvalue = false;         //set to 1 when updated dmx values are received
-volatile byte dmxvalue[NUMBER_OF_CHANNELS];   //DMX values
+volatile byte dmxvalue[CHANNELS];   //DMX values
 
 // Timer2 variables
 volatile byte zerocounter = 0;
 /* a counter to hold the number of zeros received in sequence on the serial receive pin.
    When we've received a minimum of 11 zeros in a row, we must be in a break.  */
 
+int outputPins[] = {5, 6, 9};
+
+#define DEBUG
+
+#ifdef DEBUG
+#include <SoftwareSerial.h>
+SoftwareSerial mySerial(7, 8);
+#endif
+
 void setup() {
 
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  pinMode(11, OUTPUT);
+//#ifdef DEBUG
+//  mySerial.begin(115200);
+//  mySerial.println("Start");
+//#endif
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  //  pinMode(5, OUTPUT);
+  //  pinMode(6, OUTPUT);
+  //  pinMode(9, OUTPUT);
+  //  pinMode(11, OUTPUT); MEGA
+
+  for (int i = 0; i < sizeof(outputPins); i++) {
+    pinMode(outputPins[i], OUTPUT);
+  }
+
+  //  pinMode(8, OUTPUT);
 
   // Pin Mode
   pinMode(RX_PIN, INPUT);  //sets serial pin to receive data
@@ -74,28 +100,52 @@ void setup() {
   bitClear(TIMSK2, TOIE2);   //Disable Timer/Counter2 Overflow Interrupt Enable
 
   sei();                     //reenable interrupts now that timer2 has been configured.
-
+  
+  delay(500);
+  
 }  //end setup()
 
 void loop()  {
   // the processor gets parked here while the ISRs are doing their thing.
 
   if (dmxnewvalue == 1) {
-    analogWrite(5, dmxvalue[0]);
-    analogWrite(6, dmxvalue[1]);
-    analogWrite(11, dmxvalue[2]);
+    digitalWrite(LED_BUILTIN, HIGH);
+
+    for (int i = 0; i < sizeof(outputPins); i++) {
+      analogWrite(outputPins[i], dmxvalue[i]);
+      //#ifdef DEBUG
+      //      mySerial.print(dmxvalue[i]);
+      //      mySerial.print(",");
+      //#endif
+    }
+    //#ifdef DEBUG
+    //    mySerial.println("");
+    //#endif
+
+    //    analogWrite(5, dmxvalue[0]);
+    //    analogWrite(6, dmxvalue[1]);
+    //    analogWrite(9, dmxvalue[2]);
+    //    analogWrite(11, dmxvalue[2]); MEGA
 
     dmxnewvalue = 0;
     zerocounter = 0;           //and then when finished reset variables and enable timer2 interrupt
     delay(1);
-    
+
     bitSet(TIMSK2, OCIE2A);    //Enable Timer/Counter2 Output Compare Match A Interrupt
+    digitalWrite(LED_BUILTIN, LOW);
   }
 } //end loop()
 
 //Timer2 compare match interrupt vector handler
 ISR(TIMER2_COMPA_vect) {
-  if (bitRead(PIND, PIND0)) {  // if a one is detected, we're not in a break, reset zerocounter.
+
+  //#ifdef DEBUG
+  //  mySerial.println(zerocounter);
+  //#endif
+
+  //  if (!bitRead(PINE, PINE0)) {  // Arduino Mega Italy
+  //  if (bitRead(PIND, PIND0)) {  // Arduino Mega Chaina
+  if (!bitRead(PIND, PIND0)) {  // Arduino Uno
     zerocounter = 0;
   }
   else {
@@ -104,23 +154,34 @@ ISR(TIMER2_COMPA_vect) {
     {
       bitClear(TIMSK2, OCIE2A);    //disable this interrupt and enable reception interrupt now that we're in a break.
       bitSet(UCSR0B, RXCIE0);
+      //#ifdef DEBUG
+      //      mySerial.println("Start RX");
+      //#endif
     }
   }
 } //end Timer2 ISR
 
-ISR(USART0_RX_vect) {
+//ISR(USART0_RX_vect) { // Arduino Mega
+ISR(USART_RX_vect) { // Arduino Uno
 
   byte dmxreceived = UDR0;
-
   /* The receive buffer (UDR0) must be read during the reception ISR, or the ISR will just
      execute again immediately upon exiting. */
+  int realChannel = (dmxcurrent - 4) % NUMBER_OF_CHANNELS;
 
-  dmxvalue[(dmxcurrent - 4) % NUMBER_OF_CHANNELS] = dmxreceived;
+  dmxcurrent++;
 
-  if (++dmxcurrent > NUMBER_OF_CHANNELS - 1) {
-    dmxnewvalue = 1;
-    dmxcurrent = 0;
-    bitClear(UCSR0B, RXCIE0);
+  if (realChannel >= ADDRESS && realChannel <= ADDRESS + CHANNELS) {
+    dmxvalue[currentChannel] = dmxreceived;
+    if (++currentChannel == CHANNELS) {
+      dmxnewvalue = 1;
+      dmxcurrent = 0;
+      currentChannel = 0;
+      bitClear(UCSR0B, RXCIE0);
+      //#ifdef DEBUG
+      //      mySerial.println("Start RX");
+      //#endif
+    }
   }
 
 } // end ISR
