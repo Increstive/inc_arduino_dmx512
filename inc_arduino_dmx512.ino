@@ -13,7 +13,6 @@
 
 // Addressing variables
 #define NUMBER_OF_CHANNELS 512
-unsigned int dmxaddress = 1;
 
 // Pin variables
 #define RX_PIN 0
@@ -27,7 +26,7 @@ unsigned int currentChannel = 0;
 
 volatile unsigned int dmxcurrent = 0;         //counter variable that is incremented every time we receive a value.
 volatile boolean dmxnewvalue = false;         //set to 1 when updated dmx values are received
-volatile byte dmxvalue[CHANNELS];   //DMX values
+volatile byte dmxvalue[CHANNELS];             //DMX values
 
 // Timer2 variables
 volatile byte zerocounter = 0;
@@ -51,16 +50,10 @@ void setup() {
 //#endif
 
   pinMode(LED_BUILTIN, OUTPUT);
-  //  pinMode(5, OUTPUT);
-  //  pinMode(6, OUTPUT);
-  //  pinMode(9, OUTPUT);
-  //  pinMode(11, OUTPUT); MEGA
 
   for (int i = 0; i < sizeof(outputPins); i++) {
     pinMode(outputPins[i], OUTPUT);
   }
-
-  //  pinMode(8, OUTPUT);
 
   // Pin Mode
   pinMode(RX_PIN, INPUT);  //sets serial pin to receive data
@@ -121,11 +114,6 @@ void loop()  {
     //#ifdef DEBUG
     //    mySerial.println("");
     //#endif
-
-    //    analogWrite(5, dmxvalue[0]);
-    //    analogWrite(6, dmxvalue[1]);
-    //    analogWrite(9, dmxvalue[2]);
-    //    analogWrite(11, dmxvalue[2]); MEGA
 
     dmxnewvalue = 0;
     zerocounter = 0;           //and then when finished reset variables and enable timer2 interrupt
