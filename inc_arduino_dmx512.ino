@@ -33,21 +33,26 @@ volatile byte zerocounter = 0;
 /* a counter to hold the number of zeros received in sequence on the serial receive pin.
    When we've received a minimum of 11 zeros in a row, we must be in a break.  */
 
-int outputPins[] = {5, 6, 9};
+int outputPins[] = {5, 8, 9, 3, 4, 6};
 
 #define DEBUG
 
 #ifdef DEBUG
 #include <SoftwareSerial.h>
-SoftwareSerial mySerial(7, 8);
+SoftwareSerial mySerial(11, 12);
 #endif
+
+#define potPin    A0
+#define enA       5
+#define in1       9
+#define in2       8
 
 void setup() {
 
-//#ifdef DEBUG
-//  mySerial.begin(115200);
-//  mySerial.println("Start");
-//#endif
+  //#ifdef DEBUG
+  //  mySerial.begin(115200);
+  //  mySerial.println("Start");
+  //#endif
 
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -93,9 +98,9 @@ void setup() {
   bitClear(TIMSK2, TOIE2);   //Disable Timer/Counter2 Overflow Interrupt Enable
 
   sei();                     //reenable interrupts now that timer2 has been configured.
-  
-  delay(500);
-  
+
+  //  delay(500);
+
 }  //end setup()
 
 void loop()  {
@@ -104,25 +109,71 @@ void loop()  {
   if (dmxnewvalue == 1) {
     digitalWrite(LED_BUILTIN, HIGH);
 
-    for (int i = 0; i < sizeof(outputPins); i++) {
-      analogWrite(outputPins[i], dmxvalue[i]);
-      //#ifdef DEBUG
-      //      mySerial.print(dmxvalue[i]);
-      //      mySerial.print(",");
-      //#endif
-    }
+    //    for (int i = 0; i < sizeof(outputPins); i++) {
+    //      analogWrite(outputPins[i], dmxvalue[i]);
+    //#ifdef DEBUG
+    //      mySerial.print(dmxvalue[i]);
+    //      mySerial.print(",");
+    //#endif
+    //    }
     //#ifdef DEBUG
     //    mySerial.println("");
     //#endif
 
+    SlideToValue(map(dmxvalue[1], 0, 255, 0, 1023));
+
+    SlideToValue2(map(dmxvalue[0], 0, 255, 0, 1023));
+                   
     dmxnewvalue = 0;
     zerocounter = 0;           //and then when finished reset variables and enable timer2 interrupt
-    delay(1);
+    delay(10);
 
     bitSet(TIMSK2, OCIE2A);    //Enable Timer/Counter2 Output Compare Match A Interrupt
     digitalWrite(LED_BUILTIN, LOW);
   }
 } //end loop()
+
+void SlideToValue(int targetValue) {
+  int val = analogRead(potPin);
+  //  int targetValue = analogRead(potPin2);
+  if (abs(val - targetValue) > 1) {
+    if (val > targetValue) {
+      digitalWrite(in1, LOW);
+      digitalWrite(in2, HIGH);
+    } else {
+      digitalWrite(in1, HIGH);
+      digitalWrite(in2, LOW);
+    }
+    //    analogWrite(enA, max(min(abs(val - targetValue), 255), 200));
+    analogWrite(enA, map(abs(val - targetValue), 1, 1023, 60, 250));
+  } else {
+    // Turn off motor
+    digitalWrite(in1, LOW);
+    digitalWrite(in2, LOW);
+    analogWrite(enA, 0);
+  }
+}
+
+void SlideToValue2(int targetValue) {
+  int val = analogRead(A1);
+  //  int targetValue = analogRead(potPin2);
+  if (abs(val - targetValue) > 1) {
+    if (val > targetValue) {
+      digitalWrite(3, LOW);
+      digitalWrite(4, HIGH);
+    } else {
+      digitalWrite(3, HIGH);
+      digitalWrite(4, LOW);
+    }
+    //    analogWrite(enA, max(min(abs(val - targetValue), 255), 200));
+    analogWrite(6, map(abs(val - targetValue), 1, 1023, 60, 250));
+  } else {
+    // Turn off motor
+    digitalWrite(3, LOW);
+    digitalWrite(4, LOW);
+    analogWrite(6, 0);
+  }
+}
 
 //Timer2 compare match interrupt vector handler
 ISR(TIMER2_COMPA_vect) {
